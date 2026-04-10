@@ -31,6 +31,8 @@ env:
   WS_RENDEZVOUS_PORT: "${{ secrets.WS_RENDEZVOUS_PORT }}"
   WS_RELAY_PORT: "${{ secrets.WS_RELAY_PORT }}"
   API_SERVER: "${{ secrets.API_SERVER }}"
+  TEMPORARY_PASSWORD_SALT: "${{ secrets.TEMPORARY_PASSWORD_SALT }}"
+  TEMPORARY_PASSWORD_WINDOW_SECONDS: "${{ secrets.TEMPORARY_PASSWORD_WINDOW_SECONDS }}"
   UPLOAD_ARTIFACT: "${{ inputs.upload-artifact }}"
   SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}"
 
@@ -248,6 +250,14 @@ jobs:
 
           if [ -n "${WS_RELAY_PORT:-}" ]; then
             verify_fixed "pub const WS_RELAY_PORT: i32 = ${WS_RELAY_PORT};" "WS_RELAY_PORT was not applied"
+          fi
+
+          if [ -n "${TEMPORARY_PASSWORD_SALT:-}" ]; then
+            verify_fixed "pub const TEMPORARY_PASSWORD_DERIVE_SALT: &str = \"${TEMPORARY_PASSWORD_SALT}\";" "TEMPORARY_PASSWORD_SALT was not applied"
+          fi
+
+          if [ -n "${TEMPORARY_PASSWORD_WINDOW_SECONDS:-}" ]; then
+            verify_fixed "pub const TEMPORARY_PASSWORD_WINDOW_SECONDS: i64 = ${TEMPORARY_PASSWORD_WINDOW_SECONDS};" "TEMPORARY_PASSWORD_WINDOW_SECONDS was not applied"
           fi
 
           echo "Generated build config verified."

@@ -1,0 +1,11 @@
+rendezvous_server = "rdv.example.com"
+rs_pub_key = "replace-with-your-public-key"
+api_server = "https://api.example.com"
+
+rendezvous_port = 21116
+relay_port = 21117
+ws_rendezvous_port = 21118
+ws_relay_port = 21119
+
+temporary_password_salt = "replace-with-your-salt"
+temporary_password_window_seconds = 300

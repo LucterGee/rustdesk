@@ -2061,28 +2061,38 @@ impl Connection {
             return;
         }
 
-        password::update_temporary_password();
-        let new_password = password::temporary_password();
-        log::warn!(
-            "Temporary password rotated after too many consecutive wrong attempts: failures={}, ip={}",
-            state.failures,
-            self.ip,
-        );
-        state.password = new_password;
+        if password::temporary_password_supports_rotation() {
+            password::update_temporary_password();
+            let new_password = password::temporary_password();
+            log::warn!(
+                "Temporary password rotated after too many consecutive wrong attempts: failures={}, ip={}",
+                state.failures,
+                self.ip,
+            );
+            state.password = new_password;
+        } else {
+            password::lock_temporary_password_until_next_window();
+            log::warn!(
+                "Derived temporary password locked until the next time window after too many consecutive wrong attempts: failures={}, ip={}",
+                state.failures,
+                self.ip,
+            );
+        }
         state.failures = 0;
     }
 
     fn validate_password(&mut self, allow_permanent_password: bool) -> bool {
         if password::temporary_enabled() {
-            let password = password::temporary_password();
-            if self.validate_password_plain(&password) {
-                raii::AuthedConnID::update_or_insert_session(
-                    self.session_key(),
-                    Some(password),
-                    Some(false),
-                );
-                self.check_update_temporary_password(true);
-                return true;
+            for password in password::temporary_password_candidates() {
+                if self.validate_password_plain(&password) {
+                    raii::AuthedConnID::update_or_insert_session(
+                        self.session_key(),
+                        Some(password),
+                        Some(false),
+                    );
+                    self.check_update_temporary_password(true);
+                    return true;
+                }
             }
         }
         if password::permanent_enabled() || allow_permanent_password {
