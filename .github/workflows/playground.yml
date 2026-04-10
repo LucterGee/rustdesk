@@ -22,9 +22,14 @@ env:
   #signing keys env variable checks
   ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
   MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
-  # To make a custom build with your own servers set the below secret values
+  # To make a custom build with your own servers set the below repository secrets/variables
   RS_PUB_KEY: "${{ secrets.RS_PUB_KEY }}"
   RENDEZVOUS_SERVER: "${{ secrets.RENDEZVOUS_SERVER }}"
+  RENDEZVOUS_SERVERS: "${{ secrets.RENDEZVOUS_SERVERS }}"
+  RENDEZVOUS_PORT: "${{ secrets.RENDEZVOUS_PORT }}"
+  RELAY_PORT: "${{ secrets.RELAY_PORT }}"
+  WS_RENDEZVOUS_PORT: "${{ secrets.WS_RENDEZVOUS_PORT }}"
+  WS_RELAY_PORT: "${{ secrets.WS_RELAY_PORT }}"
   API_SERVER: "${{ secrets.API_SERVER }}"
   UPLOAD_ARTIFACT: "${{ inputs.upload-artifact }}"
   SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}"
@@ -88,7 +93,7 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v3
         with:
-          ref: ${{ matrix.job.ref }}
+          ref: ${{ github.sha }}
           submodules: recursive
 
       - name: Import the codesign cert
@@ -190,6 +195,63 @@ jobs:
         run: |
           ./build.py --flutter ${{ matrix.job.extra-build-args }}
 
+      - name: Verify generated build config
+        shell: bash
+        run: |
+          set -euo pipefail
+          build_cfg="$(find target -path '*build_config.rs' -print | head -n 1)"
+          if [ -z "$build_cfg" ]; then
+            echo "Generated build_config.rs not found"
+            exit 1
+          fi
+
+          verify_fixed() {
+            local needle="$1"
+            local message="$2"
+            if ! grep -F "$needle" "$build_cfg" >/dev/null; then
+              echo "$message"
+              exit 1
+            fi
+          }
+
+          if [ -n "${RS_PUB_KEY:-}" ]; then
+            verify_fixed "pub const RS_PUB_KEY: &str = \"${RS_PUB_KEY}\";" "RS_PUB_KEY was not applied"
+          fi
+
+          if [ -n "${API_SERVER:-}" ]; then
+            verify_fixed "pub const API_SERVER: &str = \"${API_SERVER}\";" "API_SERVER was not applied"
+          fi
+
+          if [ -n "${RENDEZVOUS_SERVERS:-}" ]; then
+            IFS=',' read -r -a rendezvous_servers <<< "${RENDEZVOUS_SERVERS}"
+            for server in "${rendezvous_servers[@]}"; do
+              server="$(printf '%s' "$server" | xargs)"
+              if [ -n "$server" ]; then
+                verify_fixed "\"${server}\"" "RENDEZVOUS_SERVERS was not applied"
+              fi
+            done
+          elif [ -n "${RENDEZVOUS_SERVER:-}" ]; then
+            verify_fixed "\"${RENDEZVOUS_SERVER}\"" "RENDEZVOUS_SERVER was not applied"
+          fi
+
+          if [ -n "${RENDEZVOUS_PORT:-}" ]; then
+            verify_fixed "pub const RENDEZVOUS_PORT: i32 = ${RENDEZVOUS_PORT};" "RENDEZVOUS_PORT was not applied"
+          fi
+
+          if [ -n "${RELAY_PORT:-}" ]; then
+            verify_fixed "pub const RELAY_PORT: i32 = ${RELAY_PORT};" "RELAY_PORT was not applied"
+          fi
+
+          if [ -n "${WS_RENDEZVOUS_PORT:-}" ]; then
+            verify_fixed "pub const WS_RENDEZVOUS_PORT: i32 = ${WS_RENDEZVOUS_PORT};" "WS_RENDEZVOUS_PORT was not applied"
+          fi
+
+          if [ -n "${WS_RELAY_PORT:-}" ]; then
+            verify_fixed "pub const WS_RELAY_PORT: i32 = ${WS_RELAY_PORT};" "WS_RELAY_PORT was not applied"
+          fi
+
+          echo "Generated build config verified."
+
       - name: create unsigned dmg
         run: |
           CREATE_DMG="$(command -v create-dmg)"
@@ -249,7 +311,7 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v3
         with:
-          ref: ${{ matrix.job.ref }}
+          ref: ${{ github.sha }}
           submodules: recursive
 
       - name: Install dependencies
