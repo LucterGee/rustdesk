@@ -1,3 +1,4 @@
 [submodule "libs/hbb_common"]
 	path = libs/hbb_common
 	url = git@github.com:LucterGee/hbb_common.git
+	branch = main
