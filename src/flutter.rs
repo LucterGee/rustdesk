@@ -186,6 +186,27 @@ pub unsafe extern "C" fn free_c_args(ptr: *mut *mut c_char, len: c_int) {
     // Afterwards the vector will be dropped and thus freed.
 }
 
+// Desktop-only helper for external shells such as Electron. This reads the
+// current temporary password through IPC so callers do not rely on UI cache state.
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+#[no_mangle]
+pub extern "C" fn rustdesk_get_temporary_password() -> *mut c_char {
+    let password = crate::ipc::get_config("temporary-password")
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+    CString::new(password).unwrap_or_default().into_raw()
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+#[no_mangle]
+pub unsafe extern "C" fn rustdesk_free_string(ptr: *mut c_char) {
+    if ptr.is_null() {
+        return;
+    }
+    drop(CString::from_raw(ptr));
+}
+
 #[cfg(windows)]
 #[no_mangle]
 pub unsafe extern "C" fn get_rustdesk_app_name(buffer: *mut u16, length: i32) -> i32 {
